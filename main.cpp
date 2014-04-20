@@ -75,6 +75,43 @@ LRESULT CALLBACK mouse_proc(int nCode, WPARAM wParam, LPARAM lParam)
 	return CallNextHookEx(0, nCode, wParam, lParam);
 }
 
+HKEY GetAppSettingsKey(void)
+{
+	HKEY result = NULL;
+	RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Software\\xscrollwheel"), 0, NULL, 0, KEY_ALL_ACCESS, NULL, &result, NULL);
+	return result;
+}
+
+BOOL GetRegBool(LPTSTR value, BOOL default)
+{
+	HKEY hkey;
+	DWORD data, size;
+	BOOL result;
+	
+	hkey = GetAppSettingsKey();
+
+	size = sizeof(data);
+
+	if (RegGetValue(hkey, NULL, value, RRF_RT_REG_DWORD, NULL, &data, &size) == ERROR_SUCCESS)
+		result = (data != 0);
+	else
+		result = default;
+
+	RegCloseKey(hkey);
+
+	return result;
+}
+
+void SetRegBool(LPTSTR value, BOOL data)
+{
+	HKEY hkey;
+
+	hkey = GetAppSettingsKey();
+
+	RegSetValueEx(hkey, value, 0, REG_DWORD, (const BYTE*)&data, sizeof(data));
+
+	RegCloseKey(hkey);
+}
 
 INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -82,6 +119,8 @@ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM l
 	{
 	case WM_INITDIALOG:
 		main_dialog = hwndDlg;
+		natural_scrolling = GetRegBool(TEXT("NaturalScrolling"), FALSE);
+		Button_SetCheck(GetDlgItem(hwndDlg, IDC_CHECKNATURAL), natural_scrolling);
 		return TRUE;
 	case WM_COMMAND:
 		switch (LOWORD(wParam))
@@ -91,6 +130,7 @@ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM l
 			{
 			case BN_CLICKED:
 				natural_scrolling = Button_GetCheck((HWND)lParam);
+				SetRegBool(TEXT("NaturalScrolling"), natural_scrolling);
 				return TRUE;
 			}
 			break;
