@@ -1,7 +1,10 @@
 #include <Windows.h>
+#include <WindowsX.h>
 #include "resource.h"
 
 static HWND main_dialog;
+
+BOOL natural_scrolling = FALSE;
 
 WORD get_key_flags(void)
 {
@@ -56,10 +59,14 @@ LRESULT CALLBACK mouse_proc(int nCode, WPARAM wParam, LPARAM lParam)
 		ti.cbSize = sizeof(ti);
 		GetGUIThreadInfo(0, &ti);
 		
+		if (ti.hwndCapture != NULL)
+			target = ti.hwndCapture;
+
 		/* Do nothing if the right window is already focused, or the mouse is captured. */
-		if (target != NULL && target != ti.hwndFocus && ti.hwndCapture == NULL)
+		if ((target != NULL && target != ti.hwndFocus && ti.hwndCapture == NULL)
+			|| (natural_scrolling && target != NULL))
 		{
-			PostMessage(target, wParam, MAKELONG(get_key_flags(), hs->mouseData >> 16),
+			PostMessage(target, wParam, MAKELONG(get_key_flags(), (hs->mouseData >> 16) * (natural_scrolling ? -1 : 1)),
 				MAKELONG(hs->pt.x, hs->pt.y));
 			return 1; /* Eat this message. */
 		}
@@ -76,6 +83,18 @@ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM l
 	case WM_INITDIALOG:
 		main_dialog = hwndDlg;
 		return TRUE;
+	case WM_COMMAND:
+		switch (LOWORD(wParam))
+		{
+		case IDC_CHECKNATURAL:
+			switch (HIWORD(wParam))
+			{
+			case BN_CLICKED:
+				natural_scrolling = Button_GetCheck((HWND)lParam);
+				return TRUE;
+			}
+			break;
+		}
 	case WM_CLOSE:
 		EndDialog(hwndDlg, 0);
 		return TRUE;
